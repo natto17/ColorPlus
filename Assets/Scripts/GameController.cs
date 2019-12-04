@@ -9,6 +9,7 @@ public class GameController : MonoBehaviour
     float gameLength = 60;
     float turnLength = 2;
     int turn = 0;
+    int score = 0;
 
     GameObject[,] grid;
     int gridX = 8;
@@ -18,6 +19,8 @@ public class GameController : MonoBehaviour
     GameObject nextCube;
     Vector3 nextCubePos = new Vector3 (8, 10, 0);
     Color[] myColors = { Color.blue, Color.red, Color.green, Color.yellow, Color.magenta };
+
+    GameObject activeCube = null;
 
     // Start is called before the first frame update
     void Start()
@@ -29,14 +32,15 @@ public class GameController : MonoBehaviour
             for (int y = 0; y < gridY; y++)
             {
                 cubePos = new Vector3(x*2, y*2, 0);
-                Instantiate(cubePrefab, cubePos, Quaternion.identity);
+                grid[x,y]= Instantiate(cubePrefab, cubePos, Quaternion.identity);
             }
         }
 
     }
 
     void CreateNextCube()
-    {if (nextCube == null)
+    {
+        if (nextCube == null)
         {
             nextCube = Instantiate(cubePrefab, nextCubePos, Quaternion.identity);
         }
@@ -56,45 +60,110 @@ public class GameController : MonoBehaviour
         }
     }
 
-    int FindAvailableCube(int x)
-    {
-        //find random white cube in row, return y value
-        //or if there isnt one return -1
-        return (Random.Range(0, gridY));
+    GameObject FindAvailableCube(int y)
+    {//find random white cube in row, return y value
+        List<GameObject> whiteCubes = new List<GameObject> ();
+        for (int x = 0; x<gridX; x++)
+        {
+            if (grid[x, y].GetComponent<Renderer>().material.color== Color.white)
+            {
+                whiteCubes.Add(grid[x, y]);
+            }
+        }
+        //if no white cubes available
+        if (whiteCubes.Count == 0)
+        {
+            return null;
+        }
+
+        GameObject randomWhiteCube = whiteCubes[Random.Range(0, whiteCubes.Count)];
+
+        return randomWhiteCube;
+
+    }
+    GameObject FindAvailableCubeForBlack()
+    {//find random white cube in row, return y value
+        List<GameObject> whiteCubes = new List<GameObject>();
+        for (int y = 0; y < gridY; y++)
+        {
+            for (int x = 0; x < gridX; x++)
+            {
+                if (grid[x, y].GetComponent<Renderer>().material.color == Color.white)
+                {
+                    whiteCubes.Add(grid[x, y]);
+                }
+            }
+        }
+        //if no white cubes available
+        if (whiteCubes.Count == 0)
+        {
+            return null;
+        }
+
+        GameObject randomWhiteCube = whiteCubes[Random.Range(0, whiteCubes.Count)];
+
+        return randomWhiteCube;
 
     }
 
-    void PlaceNextCube(int x)
+    void PlaceNextCube(int y)
     {
-        int y = FindAvailableCube(x);
+        GameObject whiteCube = FindAvailableCube(y);
 
-        if (y == -1)
+        if (whiteCube == null)
         {
             EndGame(false);
         }
         else{
-            grid[x, y].GetComponent<Renderer>().material.color = nextCube.GetComponent<Renderer>().material.color;
+            whiteCube.GetComponent<Renderer>().material.color = nextCube.GetComponent<Renderer>().material.color;
             Destroy(nextCube);
             nextCube = null;
         }
     }
 
-
-    /*bool CheckForColorPlus(int x, int y)
-//checks for plus by scanning through each row and column
-//adds to score
-
     void PlaceBlackCube()
-//checks for space to place
-// if a place: randomly places cube
-//subtracts from score
-//if no place, sends to GameEnd
+    {
+        GameObject whiteCube = FindAvailableCubeForBlack();
 
-    void GenerateNextCube(int x, int y)
-//chooses random color from array
-//places cube in set spot
-//sets cube as nextCube
-*/
+        //make random white cube black
+        //if impossible, end game
+
+     if (whiteCube == null)
+        {
+            EndGame(false);
+        }
+        else
+        {
+            whiteCube.GetComponent<Renderer>().material.color = Color.black;
+        }
+        print("Placed a black cube!");
+    }
+
+
+    void CheckForOneColorPlus()
+    {
+        //checks for plus by scanning through each row and column
+        //adds to score
+        for (int x= 0; x<gridX; x++)
+        {
+            for (int y = 0; y<gridY; y++)
+            {
+                Color tempColor = grid[x, y].GetComponent<Renderer>().material.color;
+                if (grid[x + 1, y].GetComponent<Renderer>().material.color == tempColor && grid[x - 1, y].GetComponent<Renderer>().material.color == tempColor && grid[x, y + 1].GetComponent<Renderer>().material.color == tempColor && grid[x, y - 1].GetComponent<Renderer>().material.color == tempColor)
+                {
+                    score += 10;
+                }
+            }
+        }       
+    }
+
+    bool CheckForRainbowColorPlus(int x, int y)
+    {
+        //checks for rainbow
+        Color tempColor = grid[x, y].GetComponent<Renderer>().material.color;
+        score += 5;
+        return true;
+    }
 
     void ProcessKeyboardInput()
     {
@@ -123,12 +192,42 @@ public class GameController : MonoBehaviour
         }
 
         //places nextcube into row or endgame if row is full
-        if (nextCube != null)
+        if (nextCube != null && numKeyPressed != 0)
         {
             PlaceNextCube(numKeyPressed - 1);
         }
     }
+    public void ProcessClick(GameObject clickedCube, int x, int y, Color cubeColor, bool active)
+    {
+        //if colored cube, highlight cube
+        if (cubeColor != Color.white && cubeColor != Color.black && nextCube != clickedCube)
+        {   //deactivate
+            if (active)
+            {
+                clickedCube.transform.localScale /= 1.5f;
+                clickedCube.GetComponent<CubeController>().active = false;
+                activeCube = null;
+            }
+            else
+            {   //activate
+                if (activeCube != null)
+                {
+                    activeCube.transform.localScale /= 1.5f;
+                    activeCube.GetComponent<CubeController>().active = false;
+                }
+                else
+                {
+                    clickedCube.transform.localScale *= 1.5f;
+                    clickedCube.GetComponent<CubeController>().active = false;
+                    activeCube = clickedCube;
+                }
+            }
+        }
+        else if(cubeColor == Color.white)
+        {
 
+        }
+    }
     // Update is called once per frame
     void Update()
     {
@@ -136,6 +235,13 @@ public class GameController : MonoBehaviour
         if (Time.time > turnLength * turn)
         {
             turn++;
+
+            if(nextCube != null)
+            {
+                score -= 1;
+                Destroy(nextCube);
+                PlaceBlackCube();
+            }
             CreateNextCube();
 
         }
